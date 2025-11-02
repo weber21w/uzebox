@@ -1,7 +1,7 @@
-ESP-12F programming Jig V2.1 BOM - All parts from Digikey
+ESP-12F programming Jig V1.2 BOM - All parts from Digikey
 For 3V or 5V FTDI FT232 cables
 
-Note: Parts footprints compatible with PCB Rev 2.1
+Note: Parts footprints compatible with PCB Rev 1.2
 -------------------------------------------------------------------------------------------
 2x   399-6596-ND             CAP ALUM 1UF 20% 50V RADIAL TH              (C16,C20)
 1x   399-9776-ND             0.1 µF ±20% 50V Ceramic Capacitor Radial    (C12)
