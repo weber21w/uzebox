@@ -151,8 +151,9 @@ sub_video_mode_23:
 
 vm23_next_scan_line:
 	rcall hsync_pulse
+	clr r1
 
-	WAIT r19,282 - AUDIO_OUT_HSYNC_CYCLES + CENTER_ADJUSTMENT - 3 + 3
+	WAIT r19,281 - AUDIO_OUT_HSYNC_CYCLES + CENTER_ADJUSTMENT - 3 + 3
 
 	rcall render_row
 
