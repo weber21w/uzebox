@@ -86,6 +86,10 @@
         extern void SetVsyncCounter(u16 count);
 
 	extern void SetRenderingParameters(u8 firstScanlineToRender, u8 verticalTilesToRender);
+	extern bool IsHsyncSafe(u16 work_cycles);
+	extern void WaitHsyncSafe(u16 work_cycles);
+	extern bool IsVsyncSafe(u16 work_cycles);
+	extern void WaitVsyncSafe(u16 work_cycles);
 
 
 	/*
@@ -237,4 +241,3 @@
 
 
 #endif
-
