@@ -373,6 +373,19 @@
 		#define MUSIC_VSYNC_PROCESS 1
 	#endif
 
+	/*
+	 * Safety margins used by IsHsyncSafe()/IsVsyncSafe().
+	 * These margins cover the helper call overhead, branch overhead before the
+	 * protected work starts, and small snapshot races while reading Timer1.
+	 */
+	#ifndef HSYNC_SAFE_MARGIN
+		#define HSYNC_SAFE_MARGIN 96
+	#endif
+
+	#ifndef VSYNC_SAFE_MARGIN
+		#define VSYNC_SAFE_MARGIN 256
+	#endif
+
 	#if MUSIC_ENGINE == STREAM
 		#ifndef SONG_BUFFER_MIN
 			#define SONG_BUFFER_MIN	2
