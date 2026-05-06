@@ -256,6 +256,35 @@ void PatchCommand12(Track* track, char param){
 }
 #endif
 
+#if PATCH_STREAM == 1
+	#define PATCH_CMD_POS_NULL 0xffff
+
+	static u8 PatchStreamActivePatch(Track *track){
+		if(track->flags & TRACK_FLAGS_PRIORITY){
+			return track->fxPatchNo;
+		}
+		return track->patchNo;
+	}
+
+	#define PatchCmdReadAt(track, pos) UserPatchStreamReadByte(PatchStreamActivePatch(track), pos)
+	#define PatchCmdReadNext(track) UserPatchStreamReadByte(PatchStreamActivePatch(track), (track)->patchCommandStreamPos++)
+	#define PatchCmdIsActive(track) ((track)->patchCommandStreamPos != PATCH_CMD_POS_NULL)
+	#define PatchCmdStop(track) ((track)->patchCommandStreamPos = PATCH_CMD_POS_NULL)
+	#define PatchGetType(patch) UserPatchStreamGetType(patch)
+	#define PatchGetPcmData(patch) ((const char *)((u16)waves + UserPatchStreamGetPcmOffset(patch)))
+	#define PatchGetLoopStart(patch) UserPatchStreamGetLoopStart(patch)
+	#define PatchGetLoopEnd(patch) UserPatchStreamGetLoopEnd(patch)
+#else
+	#define PatchCmdReadAt(track, pos) pgm_read_byte(pos)
+	#define PatchCmdReadNext(track) pgm_read_byte((track)->patchCommandStreamPos++)
+	#define PatchCmdIsActive(track) ((track)->patchCommandStreamPos != NULL)
+	#define PatchCmdStop(track) ((track)->patchCommandStreamPos = NULL)
+	#define PatchGetType(patch) ((u8)pgm_read_byte(&(patchPointers[patch].type)))
+	#define PatchGetPcmData(patch) ((const char*)pgm_read_word(&(patchPointers[patch].pcmData)))
+	#define PatchGetLoopStart(patch) ((u16)pgm_read_word(&(patchPointers[patch].loopStart)))
+	#define PatchGetLoopEnd(patch) ((u16)pgm_read_word(&(patchPointers[patch].loopEnd)))
+#endif
+
 /*
  *  Command 13: Loop start
  * Description: Defines the start of a loop. Works in conjunction with command 14 (PC_LOOP_END).
@@ -295,7 +324,7 @@ void PatchCommand14(Track* track, char param){
 			u8 command;
 			while(1){
 				track->patchCommandStreamPos-=3;
-				command=pgm_read_byte(track->patchCommandStreamPos-3+1);
+				command=PatchCmdReadAt(track, track->patchCommandStreamPos-3+1);
 				
 				//if we found the loop point or somehow reached the previous patch, exit
 				if(command==PC_LOOP_START || command==PATCH_END) break;				
@@ -330,11 +359,16 @@ const PatchCommand patchCommands[] PROGMEM ={
 #endif
 };
 
+#if PATCH_STREAM == 0
 const Patch *patchPointers;
+#endif
 
+#if PATCH_STREAM == 1
+void InitMusicPlayer(void){
+#else
 void InitMusicPlayer(const Patch *patchPointersParam){
-
 	patchPointers=patchPointersParam;
+#endif
 
 	masterVolume=DEFAULT_MASTER_VOL;
 
@@ -1024,26 +1058,26 @@ void ProcessMusic(void){
 		track=&tracks[trackNo];
 
 		//process patch command stream
-		if((track->flags & TRACK_FLAGS_PLAYING) && (track->patchCommandStreamPos!=NULL) && ((track->flags & TRACK_FLAGS_HOLD_ENV)==0)){
+		if((track->flags & TRACK_FLAGS_PLAYING) && PatchCmdIsActive(track) && ((track->flags & TRACK_FLAGS_HOLD_ENV)==0)){
 
 			//process all simultaneous events
 			while(track->patchCurrDeltaTime==track->patchNextDeltaTime){
 
-				c1=pgm_read_byte(track->patchCommandStreamPos++);
+				c1=PatchCmdReadNext(track);
 				if(c1==PATCH_END){
 					//end of stream!
 					track->flags&=(~TRACK_FLAGS_PRIORITY);// priority=0;
-					track->patchCommandStreamPos=NULL;
+					PatchCmdStop(track);
 					break;
 
 				}else{
-					c2=pgm_read_byte(track->patchCommandStreamPos++);
+					c2=PatchCmdReadNext(track);
 					//invoke patch command function
 					((PatchCommand)pgm_read_word(&patchCommands[c1]))(track,c2);
 				}
 
 				//read next delta time
-				track->patchNextDeltaTime=pgm_read_byte(track->patchCommandStreamPos++);
+				track->patchNextDeltaTime=PatchCmdReadNext(track);
 				track->patchCurrDeltaTime=0;
 			}
 
@@ -1215,10 +1249,12 @@ void TriggerCommon(Track* track,u8 patch,u8 volume,u8 note){
 		}else if(track->channel==4){
 			//PCM channel					
 			mixer.channels.type.pcm.positionFrac=0;
-			const char *pos=(const char*)pgm_read_word(&(patchPointers[patch].pcmData));
+			const char *pos=PatchGetPcmData(patch);
+			u16 loopStart=PatchGetLoopStart(patch);
+			u16 loopEnd=PatchGetLoopEnd(patch);
 			mixer.channels.type.pcm.position=pos;				
-			mixer.pcmLoopLength=pgm_read_word(&(patchPointers[patch].loopEnd))-pgm_read_word(&(patchPointers[patch].loopStart));
-			mixer.pcmLoopEnd=pos+pgm_read_word(&(patchPointers[patch].loopEnd));
+			mixer.pcmLoopLength=loopEnd-loopStart;
+			mixer.pcmLoopEnd=pos+loopEnd;
 			SetMixerNote(track->channel,note);
 		#endif	
 
@@ -1244,10 +1280,12 @@ void TriggerCommon(Track* track,u8 patch,u8 volume,u8 note){
 			//if it's a PCM channel
 			if(track->channel==3){
 				mixer.channels.type.pcm.positionFrac=0;
-				const char *pos=(const char*)pgm_read_word(&(patchPointers[patch].pcmData));
+				const char *pos=PatchGetPcmData(patch);
+				u16 loopStart=PatchGetLoopStart(patch);
+				u16 loopEnd=PatchGetLoopEnd(patch);
 				mixer.channels.type.pcm.position=pos;
-				mixer.pcmLoopLength=pgm_read_word(&(patchPointers[patch].loopEnd))-pgm_read_word(&(patchPointers[patch].loopStart));
-				mixer.pcmLoopEnd=pos+pgm_read_word(&(patchPointers[patch].loopEnd));
+				mixer.pcmLoopLength=loopEnd-loopStart;
+				mixer.pcmLoopEnd=pos+loopEnd;
 			}else{
 				SetMixerWave(track->channel,0);
 			}
@@ -1264,14 +1302,20 @@ void TriggerCommon(Track* track,u8 patch,u8 volume,u8 note){
 		track->patchNo=patch;	
 	}
 
+#if PATCH_STREAM == 1
+	track->patchCurrDeltaTime=0;
+	track->patchNextDeltaTime=UserPatchStreamReadByte(patch, 0);
+	track->patchCommandStreamPos=1;
+#else
 	const char *pos = (const char*)pgm_read_word(&(patchPointers[patch].cmdStream));
 	if(pos==NULL){
-		track->patchCommandStreamPos=NULL;
+		PatchCmdStop(track);
 	}else{
 		track->patchCurrDeltaTime=0;
 		track->patchNextDeltaTime=pgm_read_byte(pos++);
 		track->patchCommandStreamPos=pos;
 	}
+#endif
 
 }
 
@@ -1284,7 +1328,7 @@ void TriggerCommon(Track* track,u8 patch,u8 volume,u8 note){
 void TriggerFx(unsigned char patch,unsigned char volume,bool retrig){
 	unsigned char channel;
 	
-	unsigned char type=(unsigned char)pgm_read_byte(&(patchPointers[patch].type));
+	unsigned char type=PatchGetType(patch);
 
 	//find the channel to play the fx
 	//try to steal voice 2 then 1
@@ -1309,7 +1353,7 @@ void TriggerFx(unsigned char patch,unsigned char volume,bool retrig){
 
 	Track* track=&tracks[channel];
 	track->flags=TRACK_FLAGS_PRIORITY; //priority=1;
-	track->patchCommandStreamPos = NULL;
+	PatchCmdStop(track);
 	TriggerCommon(track,patch,volume,80);
 	track->flags|=TRACK_FLAGS_PLAYING;
 }
@@ -1333,7 +1377,7 @@ void TriggerNote(unsigned char channel,unsigned char patch,unsigned char note,un
 		}else{
 		
 			track->flags=0;//&=(~TRACK_FLAGS_PRIORITY);// priority=0;
-			track->patchCommandStreamPos = NULL;
+			PatchCmdStop(track);
 			TriggerCommon(track,patch,volume,note);
 			track->flags|=TRACK_FLAGS_PLAYING;
 		}
