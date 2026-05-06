@@ -116,7 +116,11 @@
 		extern void StartSong(const char *song, u16 startPos, bool loop);
 	#endif
 	extern void ResumeSong();
-	extern void InitMusicPlayer(const struct PatchStruct *patchPointersParam);
+	#if PATCH_STREAM == 1
+		extern void InitMusicPlayer(void);
+	#else
+		extern void InitMusicPlayer(const struct PatchStruct *patchPointersParam);
+	#endif
 	extern void EnableSoundEngine();
 	extern void DisableSoundEngine();
 	extern void SetSongSpeed(u8 speed);
