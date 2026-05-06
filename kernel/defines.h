@@ -351,6 +351,16 @@
 		#define MUSIC_ENGINE MIDI
 	#endif
 
+	/*
+	 * Virtualize patch metadata and command streams.
+	 *
+	 * 0 = normal PROGMEM PatchStruct table.
+	 * 1 = user callbacks provide patch type, PCM metadata, and command bytes.
+	 */
+	#ifndef PATCH_STREAM
+		#define PATCH_STREAM 0
+	#endif
+
 
 	#if MUSIC_ENGINE == STREAM
 		#ifndef SONG_BUFFER_MIN
