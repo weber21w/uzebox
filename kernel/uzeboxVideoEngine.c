@@ -307,6 +307,105 @@ void WaitVsync(int count){
 	}
 }
 
+extern volatile u8 sync_phase;
+extern volatile u8 sync_pulse;
+
+static bool AddCyclesMargin(u16 work_cycles,u16 margin,u16 *need){
+	*need=work_cycles+margin;
+	return (*need>=work_cycles);
+}
+
+/*
+ * Returns true if work_cycles should fit before the next HSYNC Timer1
+ * interrupt. This is intentionally conservative and only reports safe during
+ * normal HSYNC phase, not during VSYNC/equalization pulses.
+ */
+bool IsHsyncSafe(u16 work_cycles){
+	u16 need;
+	u16 tcnt;
+
+	if(!AddCyclesMargin(work_cycles,HSYNC_SAFE_MARGIN,&need)){
+		return false;
+	}
+
+	if(sync_phase==0){
+		return false;
+	}
+
+	tcnt=TCNT1;
+	if(tcnt>=HDRIVE_CL){
+		return false;
+	}
+
+	return (need<(HDRIVE_CL-tcnt));
+}
+
+void WaitHsyncSafe(u16 work_cycles){
+	while(!IsHsyncSafe(work_cycles));
+}
+
+/*
+ * Returns true if work_cycles should fit before the next VSYNC processing
+ * point. This allows normal HSYNC interrupts to occur, but avoids starting
+ * work that would still be active when the kernel enters VSYNC and may run
+ * ProcessMusic()/PATCH_STREAM callbacks.
+ */
+bool IsVsyncSafe(u16 work_cycles){
+	u8 phase;
+	u8 pulse1;
+	u8 pulse2;
+	u8 full_lines;
+	u16 tcnt;
+	u16 need;
+	u16 remain;
+
+	if(!AddCyclesMargin(work_cycles,VSYNC_SAFE_MARGIN,&need)){
+		return false;
+	}
+
+	/*
+	 * Take a stable-ish snapshot without disabling interrupts. Delaying the
+	 * sync ISR with cli/sei would be worse than a conservative false result.
+	 */
+	do{
+		pulse1=sync_pulse;
+		phase=sync_phase;
+		tcnt=TCNT1;
+		pulse2=sync_pulse;
+	}while(pulse1!=pulse2);
+
+	if(phase==0){
+		return false;
+	}
+
+	if(pulse1==0){
+		return false;
+	}
+
+	if(tcnt>=HDRIVE_CL){
+		return false;
+	}
+
+	remain=HDRIVE_CL-tcnt;
+	if(need<remain){
+		return true;
+	}
+
+	need-=remain;
+	full_lines=pulse1-1;
+
+	/* 37 * 1820 > 65535, so any larger line count fits any u16 request. */
+	if(full_lines>=37){
+		return true;
+	}
+
+	return (need<((u16)full_lines*(u16)(HDRIVE_CL+1)));
+}
+
+void WaitVsyncSafe(u16 work_cycles){
+	while(!IsVsyncSafe(work_cycles));
+}
+
 
 #ifndef NO_FADER
 	#define NO_FADER 0
