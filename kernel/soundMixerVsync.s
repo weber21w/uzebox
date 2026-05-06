@@ -127,10 +127,10 @@ process_music:
 
 	//call update_sound
 	
-#if ENABLE_MIXER==1
+#if ((ENABLE_MIXER == 1) && (MUSIC_VSYNC_PROCESS == 1))
 	lds ZL,sound_enabled
 	sbrc ZL,0
- 	call ProcessMusic
+	call ProcessMusic
 #endif
 
 
