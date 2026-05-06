@@ -361,6 +361,17 @@
 		#define PATCH_STREAM 0
 	#endif
 
+	/*
+	 * Determines who processes the music player state.
+	 *
+	 * 1 = the kernel calls ProcessMusic() during VSYNC (default).
+	 * 0 = the user program must call ProcessMusic() manually. This is useful
+	 *     when patch callbacks read from SPI RAM or another non-reentrant
+	 *     stream source that user code may also access outside VSYNC.
+	 */
+	#ifndef MUSIC_VSYNC_PROCESS
+		#define MUSIC_VSYNC_PROCESS 1
+	#endif
 
 	#if MUSIC_ENGINE == STREAM
 		#ifndef SONG_BUFFER_MIN
