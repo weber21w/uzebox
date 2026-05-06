@@ -121,6 +121,9 @@
 	#else
 		extern void InitMusicPlayer(const struct PatchStruct *patchPointersParam);
 	#endif
+	#if MUSIC_VSYNC_PROCESS == 0
+		extern void ProcessMusic(void); //call once per frame from user code
+	#endif
 	extern void EnableSoundEngine();
 	extern void DisableSoundEngine();
 	extern void SetSongSpeed(u8 speed);
