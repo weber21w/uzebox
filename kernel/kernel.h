@@ -92,8 +92,12 @@
 
 	typedef void (*VsyncCallBackFunc)(void);
 	typedef void (*HsyncCallBackFunc)(void);
-#if (PATCH_RAM_SOURCE != 0)
-	extern u8 UserRamPatchCallback(u8 patch, u8 pos);
+#if (PATCH_STREAM == 1)
+	extern u8 UserPatchStreamGetType(u8 patch);
+	extern u16 UserPatchStreamGetPcmOffset(u8 patch);
+	extern u16 UserPatchStreamGetLoopStart(u8 patch);
+	extern u16 UserPatchStreamGetLoopEnd(u8 patch);
+	extern u8 UserPatchStreamReadByte(u8 patch, u16 offset);
 #endif
 #if (WAVE_RAM_SOURCE != 0)
 	extern void UserRamWaveCallback(u8 wave, u8 chan);
@@ -147,7 +151,11 @@
 		unsigned char patchNextDeltaTime;
 		unsigned char patchCurrDeltaTime;
 		unsigned char patchPlayingTime;	//used by fx to steal oldest voice
+	#if PATCH_STREAM == 1
+		u16 patchCommandStreamPos;
+	#else
 		const char *patchCommandStreamPos;
+	#endif
 		
 	};
 	typedef struct TrackStruct Track;
